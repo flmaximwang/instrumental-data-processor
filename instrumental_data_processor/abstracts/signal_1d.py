@@ -1,11 +1,14 @@
 import typing
+import re
 import pandas as pd
 import matplotlib.pyplot as plt
 from .signal import Signal
+import  instrumental_data_processor.utils.path_utils as path_utils
 
 chromatographic_units_map_types = {
     "min": "Time",
     "mL": "Volume",
+    "ml": "Volume",
     "mAU": "Absorbance",
 }
 
@@ -15,7 +18,40 @@ spectroscopic_units_map_types = {
 }
 
 class Signal1D(Signal):
-    def __init__(self, data: pd.DataFrame, name: str):
+    
+    @classmethod
+    def from_csv(cls, path, name=None, formatted=True, **kwargs):
+        if name is None:
+            name = path_utils.get_name_from_path(path)
+        if formatted:
+            return cls.from_formatted_csv(path, name, **kwargs)
+        else:
+            return cls.from_unformatted_csv(path, name, **kwargs)
+        
+    @classmethod
+    def from_formatted_csv(cls, path, name, **kwargs):
+        '''
+        See pandas.read_csv for supported kwargs
+        '''
+        data: pd.DataFrame = pd.read_csv(path, **kwargs)
+        # 格式化的 csv 文件, 其表头应当类似于 axis_type (axis_unit), value_type (value_unit)
+        if not re.match(r'(.*)\((.*)\)', data.columns[0]):
+            raise ValueError(f"Expected the first column of the csv file to be formatted like axis_type (axis_unit), but got {data.columns[0]}, you may want to set formatted=False")
+        if not re.match(r'(.*)\((.*)\)', data.columns[1]):
+            raise ValueError(f"Expected the second column of the csv file to be formatted like value_type (value_unit), but got {data.columns[1]}, you may want to set formatted=False")
+        axis_type, axis_unit = re.match(r'(.*)\((.*)\)', data.columns[0]).groups()
+        value_type, value_unit = re.match(r'(.*)\((.*)\)', data.columns[1]).groups()
+        return cls(data, name, axis_type, axis_unit, value_type, value_unit)
+        
+    @classmethod
+    def from_unformatted_csv(cls, path, name, **kwargs):
+        '''
+        See pandas.read_csv for supported kwargs
+        '''
+        data = pd.read_csv(path, **kwargs)
+        return cls(data, name)
+    
+    def __init__(self, data: pd.DataFrame, name: str, axis_type="undefined", axis_unit=None, value_type="undefined", value_unit=None):
         super().__init__(data, name)
         self.axis_type = "undefined"
         self.axis_unit = None
@@ -45,20 +81,31 @@ class Signal1D(Signal):
     def get_axis_type(self):
         return self.axis_type
     
+    def set_axis_type(self, axis_type):
+        self.axis_type = axis_type
+    
     def get_axis_unit(self):
         return self.axis_unit
+    
+    def set_axis_unit(self, axis_unit):
+        self.axis_unit = axis_unit
     
     def get_value_type(self):
         return self.value_type
     
+    def set_value_type(self, value_type):
+        self.value_type = value_type
+    
     def get_value_unit(self):
         return self.value_unit
+    
+    def set_value_unit(self, value_unit):
+        self.value_unit = value_unit
     
     def plot_at(self, ax: plt.Axes, label, **kwargs) -> plt.Axes:
         pass
 
 class NumericSignal1D(Signal1D):
-
 
     def __mul__(self, factor):
         """
@@ -216,9 +263,25 @@ class AnnotationSignal1D(Signal1D):
         
 class FractionSignal(AnnotationSignal1D):
     
-    def __init__(self, data, name, axis_type):
-        super().__init__(data, name)
-        self.axis_type = axis_type
-        self.axis_unit = None
+    @classmethod
+    def from_csv(cls, path, name=None, formatted=True, axis_unit=None, **kwargs):
+        '''
+        See pandas.read_csv for supported kwargs
+        '''
+        
+        fraction_signal = super().from_csv(path, name, **kwargs)
+        if not 
+    
+    def __init__(self, data, name, axis_type, axis_unit):
+        super().__init__(data, name, axis_type, axis_unit, "Fraction", None)
+        if not axis_unit in chromatographic_units_map_types.keys():
+            raise ValueError(f"Expected axis_unit to be one of {chromatographic_units_map_types.keys()}, but got {axis_unit}")
+        
+        self.axis_unit = axis_unit
+        if not axis_type:
+            self.axis_type = chromatographic_units_map_types[axis_unit]
+        else:
+            self.axis_type = axis_type
+            
         self.value_type = "Fraction"
         self.value_unit = None

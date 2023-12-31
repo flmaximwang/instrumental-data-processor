@@ -10,6 +10,9 @@ class TestSignal(unittest.TestCase):
 
 class TestSignal1D(unittest.TestCase):
     
+    def test_from_csv(self):
+        abstracts.Signal1D.from_csv('tests/data/table_1_formatted.csv')
+    
     def test_get_axis(self):
         signal = abstracts.abstracts.Signal1D.from_csv('tests/data/table_2.csv')
         self.assertEqual(signal.get_axis().iloc[0], 1)
@@ -37,7 +40,8 @@ class TestNumericSignal1D(unittest.TestCase):
 class TestFractionSignal(unittest.TestCase):
 
     def test_preview(self):
-        fraction_signal = abstracts.FractionSignal.from_csv('tests/data/fraction.csv')
+        fraction_signal = abstracts.FractionSignal.from_csv('tests/data/fraction.csv', "ml")
+        fraction_signal.set_axis_type("Volume")
         fraction_signal.preview(rotation=90)
         
 if __name__ == '__main__':
