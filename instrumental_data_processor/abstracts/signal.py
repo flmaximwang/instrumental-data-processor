@@ -1,15 +1,18 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import path_utils
+import instrumental_data_processor.utils.path_utils as path_utils
 
 class Signal:
     
     @classmethod
-    def from_csv(cls, path, name=None):
+    def from_csv(cls, path, name=None, **kwargs):
+        '''
+        See pandas.read_csv for supported kwargs
+        '''
         if name is None:
-            name = ".".join(os.path.basename(path).split('.')[:-1])
-        data = pd.read_csv(path)
+            name = path_utils.get_name_from_path(path)
+        data = pd.read_csv(path, **kwargs)
         return cls(data, name)
     
     def __init__(self, data: pd.DataFrame, name: str):
