@@ -2,8 +2,8 @@ import typing
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
-from .signal import Signal
-import  instrumental_data_processor.utils.path_utils as path_utils
+from .signal import DescriptionAnnotation, Signal, AnnotationDescriptionAnnotation, NumericDescriptionAnnotation
+from ..utils import path_utils, transform_utils
 
 chromatographic_units_map_types = {
     "min": "Time",
@@ -17,46 +17,118 @@ spectroscopic_units_map_types = {
     "": "Absorbance",
 }
 
+units_map_types = [chromatographic_units_map_types, spectroscopic_units_map_types]
+
+
 class Signal1D(Signal):
-    
+    """
+    1D signals are signals with two descriptions. The first is called axis, the second is called value.
+    Value describes the property of every point on the axis, like the absorbance of a sample at a certain wavelength.
+    """
+
     @classmethod
-    def from_csv(cls, path, name=None, formatted=True, **kwargs):
+    def from_csv(
+        cls,
+        path,
+        name=None,
+        detect_axis_name_and_unit=False,
+        detect_value_name_and_unit=False,
+        axis_name=None,
+        axis_unit=None,
+        value_name=None,
+        value_unit=None,
+        **kwargs,
+    ):
         if name is None:
             name = path_utils.get_name_from_path(path)
-        if formatted:
-            return cls.from_formatted_csv(path, name, **kwargs)
-        else:
-            return cls.from_unformatted_csv(path, name, **kwargs)
-        
-    @classmethod
-    def from_formatted_csv(cls, path, name, **kwargs):
-        '''
-        See pandas.read_csv for supported kwargs
-        '''
         data: pd.DataFrame = pd.read_csv(path, **kwargs)
-        # 格式化的 csv 文件, 其表头应当类似于 axis_type (axis_unit), value_type (value_unit)
-        if not re.match(r'(.*)\((.*)\)', data.columns[0]):
-            raise ValueError(f"Expected the first column of the csv file to be formatted like axis_type (axis_unit), but got {data.columns[0]}, you may want to set formatted=False")
-        if not re.match(r'(.*)\((.*)\)', data.columns[1]):
-            raise ValueError(f"Expected the second column of the csv file to be formatted like value_type (value_unit), but got {data.columns[1]}, you may want to set formatted=False")
-        axis_type, axis_unit = re.match(r'(.*)\((.*)\)', data.columns[0]).groups()
-        value_type, value_unit = re.match(r'(.*)\((.*)\)', data.columns[1]).groups()
-        return cls(data, name, axis_type, axis_unit, value_type, value_unit)
-        
-    @classmethod
-    def from_unformatted_csv(cls, path, name, **kwargs):
-        '''
-        See pandas.read_csv for supported kwargs
-        '''
-        data = pd.read_csv(path, **kwargs)
-        return cls(data, name)
-    
-    def __init__(self, data: pd.DataFrame, name: str, axis_type="undefined", axis_unit=None, value_type="undefined", value_unit=None):
-        super().__init__(data, name)
-        self.axis_type = "undefined"
-        self.axis_unit = None
-        self.value_type = "undefined"
-        self.value_unit = None
+        if detect_axis_name_and_unit:
+            axis_name, axis_unit = cls.get_type_and_unit_from_header(data.columns[0])
+        else:
+            if not axis_name:
+                axis_name = data.columns[0]
+            axis_unit = axis_unit
+        if detect_value_name_and_unit:
+            value_name, value_unit = cls.get_type_and_unit_from_header(data.columns[1])
+        else:
+            if not value_name:
+                value_name = data.columns[1]
+            value_unit = value_unit
+        return cls(
+            data,
+            name,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            value_name=value_name,
+            value_unit=value_unit,
+            update="to_data",
+        )
+
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        name: str,
+        axis_name=None,
+        axis_unit=None,
+        value_name=None,
+        value_unit=None,
+        update="to_data",
+        detect_axis_name_and_unit=False,
+        detect_value_name_and_unit=False,
+    ):
+        super().__init__(
+            data=data,
+            name=name,
+        )
+        if detect_axis_name_and_unit:
+            axis_name, axis_unit = self.get_type_and_unit_from_header(
+                self.get_data().columns[0]
+            )
+        else:
+            if not axis_name:
+                axis_name = self.get_data().columns[0]
+            axis_unit = axis_unit
+        if detect_value_name_and_unit:
+            value_name, value_unit = self.get_type_and_unit_from_header(
+                self.get_data().columns[1]
+            )
+        else:
+            if not value_name:
+                value_name = self.get_data().columns[1]
+            value_unit = value_unit
+        self.description_annotations = [
+            DescriptionAnnotation(axis_name, axis_unit),
+            DescriptionAnnotation(value_name, value_unit),
+        ]
+        self.set_axis_name(axis_name)
+        self.set_axis_unit(axis_unit)
+        self.set_value_name(value_name)
+        self.set_value_unit(value_unit)
+        if update == "from_data":
+            self.update_type_and_unit_from_data(
+                detect_axis_name_and_unit, detect_value_name_and_unit
+            )
+        elif update == "to_data":
+            self.update_types_and_units_to_data()
+        else:
+            raise ValueError(
+                f"Expected update to be one of ['from_data', 'to_data'], but got {update}"
+            )
+
+    def copy(self):
+        copied_signal = type(self)(
+            self.get_data().copy(),
+            self.get_name(),
+            self.get_axis_name(),
+            self.get_axis_unit(),
+            self.get_value_name(),
+            self.get_value_unit(),
+            "to_data",
+            False,
+            False,
+        )
+
+        return copied_signal
 
     def get_axis(self):
         return self.data.iloc[:, 0]
@@ -68,6 +140,10 @@ class Signal1D(Signal):
         axis_filter = (self.data.iloc[:, 0] > start) & (self.data.iloc[:, 0] < end)
         return self.get_axis()[axis_filter]
 
+    def set_values(self, values):
+        old_values = self.get_values()
+        old_values = values
+
     def get_values(self):
         return self.data.iloc[:, 1]
 
@@ -77,35 +153,197 @@ class Signal1D(Signal):
         """
         axis_filter = (self.data.iloc[:, 0] > start) & (self.data.iloc[:, 0] < end)
         return self.get_values()[axis_filter]
-    
-    def get_axis_type(self):
-        return self.axis_type
-    
-    def set_axis_type(self, axis_type):
-        self.axis_type = axis_type
-    
+
+    def get_axis_name(self):
+        return self.get_description_annotations_by_index(0).get_name()
+
+    def set_axis_name(self, axis_name):
+        self.get_description_annotations_by_index(0).set_name(axis_name)
+        self.update_types_and_units_to_data()
+
     def get_axis_unit(self):
-        return self.axis_unit
-    
+        return self.get_description_annotations_by_index(0).get_unit() 
+
     def set_axis_unit(self, axis_unit):
-        self.axis_unit = axis_unit
-    
-    def get_value_type(self):
-        return self.value_type
-    
-    def set_value_type(self, value_type):
-        self.value_type = value_type
-    
+        self.get_description_annotations_by_index(0).set_unit(axis_unit)
+        self.update_types_and_units_to_data()
+        
+    def get_axis_label(self):
+        return self.get_description_annotations_by_index(0).get_label()
+
+    def get_value_name(self):
+        return self.get_description_annotations_by_index(1).get_name()
+
+    def set_value_name(self, value_type):
+        self.get_description_annotations_by_index(1).set_name(value_type)
+        self.update_types_and_units_to_data()
+
     def get_value_unit(self):
-        return self.value_unit
-    
+        return self.get_description_annotations_by_index(1).get_unit()
+
     def set_value_unit(self, value_unit):
-        self.value_unit = value_unit
+        self.get_description_annotations_by_index(1).set_unit(value_unit)
+        self.update_types_and_units_to_data()
+
+    def get_value_label(self):
+        return self.get_description_annotations_by_index(1).get_label()
     
+    def get_axis_ticks(self):
+        return self.get_description_annotations_by_index(0).get_ticks()
+    
+    def get_axis_tick_labels(self):
+        return self.get_description_annotations_by_index(0).get_tick_labels()
+    
+    def get_value_ticks(self):
+        return self.get_description_annotations_by_index(1).get_ticks()
+    
+    def get_value_tick_labels(self):
+        return self.get_description_annotations_by_index(1).get_tick_labels()
+    
+    def set_axis_tick_number(self, tick_number):
+        self.get_description_annotations_by_index(0).set_tick_number(tick_number)
+        
+    def set_value_tick_number(self, tick_number):
+        self.get_description_annotations_by_index(1).set_tick_number(tick_number)
+
+    def update_types_and_units_to_data(self):
+        old_columns = self.get_data().columns
+        if self.get_value_unit() and self.get_axis_unit():
+            new_columns = [
+                f"{self.get_axis_name()} ({self.get_axis_unit()})",
+                f"{self.get_value_name()} ({self.get_value_unit()})",
+            ]
+        elif self.get_value_unit():
+            new_columns = [
+                f"{self.get_axis_name()}",
+                f"{self.get_value_name()} ({self.get_value_unit()})",
+            ]
+        elif self.get_axis_unit():
+            new_columns = [
+                f"{self.get_axis_name()} ({self.get_axis_unit()})",
+                f"{self.get_value_name()}",
+            ]
+        else:
+            new_columns = [f"{self.get_axis_name()}", f"{self.get_value_name()}"]
+        self.get_data().rename(
+            columns=dict(zip(old_columns, new_columns)), inplace=True
+        )
+
+    def update_type_and_unit_from_data(
+        self, detect_axis_name_and_unit=True, detect_value_name_and_unit=True
+    ):
+        if detect_axis_name_and_unit:
+            axis_name, axis_unit = self.get_type_and_unit_from_header(
+                self.get_data().columns[0]
+            )
+        else:
+            axis_name, axis_unit = self.get_data().columns[0], None
+        if detect_value_name_and_unit:
+            value_name, value_unit = self.get_type_and_unit_from_header(
+                self.get_data().columns[1]
+            )
+        else:
+            value_name, value_unit = self.get_data().columns[1], None
+        self.set_axis_name(axis_name)
+        self.set_axis_unit(axis_unit)
+        self.set_value_name(value_name)
+        self.set_value_unit(value_unit)
+
     def plot_at(self, ax: plt.Axes, label, **kwargs) -> plt.Axes:
         pass
 
+    def preview(self, export_path=None, **kwargs):
+        if type(self) is Signal1D:
+            raise TypeError("An abstract Signal1D should not be previewed.")
+        fig, ax = plt.subplots(1, 1)
+        handle = self.plot_at(ax, label=self.get_name(), **kwargs)
+        ax.set_xlabel(self.get_axis_label())
+        ax.set_ylabel(self.get_value_label())
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_xticks(self.get_axis_ticks())
+        ax.set_xticklabels(self.get_axis_tick_labels())
+        ax.set_yticks(self.get_value_ticks())
+        ax.set_yticklabels(self.get_value_tick_labels())
+        ax.legend(handles=[handle])
+        if export_path:
+            fig.savefig(export_path)
+        else:
+            plt.show()
+
 class NumericSignal1D(Signal1D):
+    '''
+    NumericSignal1D 是 Signal1D 的子类, 用于表示 axis 与 value 都是数值的信号
+    '''
+    
+    def __init__(
+        self,
+        data,
+        name,
+        axis_name=None,
+        axis_unit=None,
+        value_name=None,
+        value_unit=None,
+        update="to_data",
+        detect_axis_name_and_unit=False,
+        detect_value_name_and_unit=False,
+        axis_limit=None,
+        value_limit=None,
+    ):
+        super().__init__(
+            data=data,
+            name=name,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            value_name=value_name,
+            value_unit=value_unit,
+            update=update,
+            detect_axis_name_and_unit=detect_axis_name_and_unit,
+            detect_value_name_and_unit=detect_value_name_and_unit,
+        )
+        self.description_annotations = [
+            NumericDescriptionAnnotation(
+                self.get_axis_name(),
+                self.get_axis_unit(),
+                (self.get_axis().min(), self.get_axis().max()),
+                10,
+            ),
+            NumericDescriptionAnnotation(
+                self.get_value_name(),
+                self.get_value_unit(),
+                (self.get_values().min(), self.get_values().max()),
+                10,
+            ),
+        ]
+
+    def copy(self):
+        copied_signal = type(self)(
+            data=self.get_data().copy(),
+            name=self.get_name(),
+            axis_type=self.get_axis_name(),
+            axis_unit=self.get_axis_unit(),
+            value_type=self.get_value_name(),
+            value_unit=self.get_value_unit(),
+            update="to_data",
+            detect_axis_type_and_unit=False,
+            detect_value_type_and_unit=False,
+            axis_limit=self.get_axis_limit(),
+            value_limit=self.get_value_limit(),
+        )
+
+        return copied_signal
+
+    def get_axis_limit(self):
+        return self.get_limit(0)
+
+    def set_axis_limit(self, axis_limit):
+        self.set_limit(0, axis_limit)
+
+    def get_value_limit(self):
+        return self.get_limit(1)
+
+    def set_value_limit(self, value_limit):
+        self.set_limit(1, value_limit)
 
     def __mul__(self, factor):
         """
@@ -114,7 +352,13 @@ class NumericSignal1D(Signal1D):
         """
         values = self.get_values()
         values *= factor
-    
+
+    def rescale_between(self, target_0, target_1, inplace=False):
+        values = (self.get_values() - target_0) / (target_1 - target_0)
+        if inplace:
+            self.set_values(values)
+        return values
+
     def get_peak_between(self, start, end) -> typing.Tuple[float, float]:
         """
         寻找当 axis 位于 start 与 end 之间时, value 的最大值以及对应的 axis, 返回一个 (axis, value) 的元组
@@ -137,7 +381,13 @@ class NumericSignal1D(Signal1D):
         - horizontalalignment: center | right | left
         - verticalalignment: center | top | bottom
         """
-        handle, = ax.plot(self.get_axis(), self.get_values(), label, **kwargs)
+        axis_to_plot = transform_utils.rescale_to_0_1(
+            self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1]
+        )
+        values_to_plot = transform_utils.rescale_to_0_1(
+            self.get_values(), self.get_values().min(), self.get_values().max()
+        )
+        (handle,) = ax.plot(axis_to_plot, values_to_plot, label=label, **kwargs)
         return handle
 
     def plot_peak_at(
@@ -170,7 +420,7 @@ class NumericSignal1D(Signal1D):
         ax.annotate(
             f"{peak_axis:.2f} {self.axis_unit}",
             xy=(peak_axis, peak_value),
-            xytext=(peak_axis+text_shift[0], peak_value+text_shift[1]),
+            xytext=(peak_axis + text_shift[0], peak_value + text_shift[1]),
             **kwargs,
         )
 
@@ -188,26 +438,81 @@ class NumericSignal1D(Signal1D):
             ),
             **kwargs,
         )
-        
-    def preview(self, **kwargs):
-        fig, ax = plt.subplots(1, 1)
-        self.plot_at(ax, label=self.name)
-        if self.axis_unit:
-            ax.set_xlabel(f"{self.axis_type} ({self.axis_unit})")
-        else:
-            ax.set_xlabel(f"{self.axis_type}")
-        if self.value_unit:
-            ax.set_ylabel(f"{self.value_type} ({self.value_unit})")
-        else:
-            ax.set_ylabel(f"{self.value_type}")
-        ax.set_xlim(self.get_axis().min(), self.get_axis().max())
-        ax.set_ylim(0, 1)
-        ax.legend()
-        plt.show()
+
 
 class AnnotationSignal1D(Signal1D):
+    '''
+    AnnotationSignal1D 是 Signal1D 的子类, 用于表示 axis 是数值, 但是 value 是注释的信号
+    '''
+    @classmethod
+    def from_csv(
+        cls,
+        path,
+        name=None,
+        detect_axis_name_and_unit=True,
+        detect_value_name_and_unit=False,
+        axis_name=None,
+        axis_unit=None,
+        value_name="Fraction",
+        value_unit=None,
+        **kwargs
+    ):
+        return super().from_csv(
+            path,
+            name,
+            detect_axis_name_and_unit=detect_axis_name_and_unit,
+            detect_value_name_and_unit=detect_value_name_and_unit,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            value_name=value_name,
+            value_unit=value_unit,
+            **kwargs)
     
-    def plot_at(self, ax: plt.Axes, label, text_shift=(0, 0), mark_height=0.5, **kwargs):
+    def __init__(
+        self,
+        data,
+        name, 
+        axis_name=None,
+        axis_unit=None,
+        value_name=None,
+        value_unit=None,
+        update="to_data",
+        detect_axis_name_and_unit=False,
+        detect_value_name_and_unit=False,
+    ):
+        super().__init__(
+            data=data,
+            name=name,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            value_name=value_name,
+            value_unit=value_unit,
+            update=update,
+            detect_axis_name_and_unit=detect_axis_name_and_unit,
+            detect_value_name_and_unit=detect_value_name_and_unit
+        )
+        self.description_annotations = [
+            NumericDescriptionAnnotation(
+                self.get_axis_name(),
+                self.get_axis_unit(),
+                (self.get_axis().min(), self.get_axis().max()),
+                10,
+            ),
+            AnnotationDescriptionAnnotation(
+                self.get_value_name(),
+                self.get_value_unit()
+            ),
+        ]
+    
+    def get_axis_limit(self):
+        return self.get_limit(0)
+
+    def set_axis_limit(self, axis_limit):
+        self.set_limit(0, axis_limit)
+
+    def plot_at(
+        self, ax: plt.Axes, label, text_shift=(0, 0), mark_height=0.5, **kwargs
+    ):
         """
         Plot the signal at the given ax and return an artist handle.
         You can provide extra arguments to the plot function by **kwargs. Available arguments are listed below:
@@ -222,14 +527,15 @@ class AnnotationSignal1D(Signal1D):
         """
         kwargs_for_annotate = kwargs.copy()
         kwargs_for_Line2D = kwargs.copy()
-        
         kwargs_for_Line2D.pop("rotation", None)
-        ax.vlines(self.get_axis(), 0, mark_height, **kwargs_for_Line2D)
-        for (axis, value) in zip(self.get_axis(), self.get_values()):
+        axis_to_plot = transform_utils.rescale_to_0_1(self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1])
+        print(axis_to_plot)
+        ax.vlines(axis_to_plot, 0, mark_height, **kwargs_for_Line2D)
+        for axis, value in zip(axis_to_plot, self.get_values()):
             ax.annotate(
                 f"{value}",
                 xy=(axis, mark_height),
-                xytext=(axis+text_shift[0], 0.5+text_shift[1]),
+                xytext=(axis + text_shift[0], 0.5 + text_shift[1]),
                 arrowprops=dict(
                     arrowstyle="-",
                     color=kwargs.get("color", "black"),
@@ -237,51 +543,65 @@ class AnnotationSignal1D(Signal1D):
                 ),
                 **kwargs_for_annotate,
             )
-            
-        handle = plt.Line2D([0], [0], label=label, **kwargs_for_Line2D) # Generate a virtural handle for legend
+
+        handle = plt.Line2D(
+            [0], [0], label=label, **kwargs_for_Line2D
+        )  # Generate a virtural handle for legend
         return handle
-    
-    def preview(self, export_path=None, **kwargs):
-        fig, ax = plt.subplots(1, 1)
-        handles = []
-        handles.append(self.plot_at(ax, label=self.name, **kwargs))
-        if self.axis_unit:
-            ax.set_xlabel(f"{self.axis_type} ({self.axis_unit})")
-        else:
-            ax.set_xlabel(f"{self.axis_type}")
-        if self.value_unit:
-            ax.set_ylabel(f"{self.value_type} ({self.value_unit})")
-        else:
-            ax.set_ylabel(f"{self.value_type}")
-        ax.set_xlim(self.get_axis().min(), self.get_axis().max())
-        ax.set_ylim(0, 1)
-        ax.legend(handles=handles)
-        if export_path:
-            fig.savefig(export_path)
-        else:
-            plt.show()
-        
+
 class FractionSignal(AnnotationSignal1D):
-    
     @classmethod
-    def from_csv(cls, path, name=None, formatted=True, axis_unit=None, **kwargs):
-        '''
-        See pandas.read_csv for supported kwargs
-        '''
-        
-        fraction_signal = super().from_csv(path, name, **kwargs)
-        if not 
-    
-    def __init__(self, data, name, axis_type, axis_unit):
-        super().__init__(data, name, axis_type, axis_unit, "Fraction", None)
+    def from_csv(
+        cls,
+        path,
+        name=None,
+        detect_axis_name_and_unit=True,
+        detect_value_name_and_unit=False,
+        axis_name=None,
+        axis_unit=None,
+        value_name="Fraction",
+        value_unit=None,
+        **kwargs
+    ):
+        return super().from_csv(
+            path=path,
+            name=name,
+            detect_axis_name_and_unit=detect_axis_name_and_unit,
+            detect_value_name_and_unit=detect_value_name_and_unit,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            value_name=value_name,
+            value_unit=value_unit,
+            **kwargs
+        ) 
+
+    def __init__(
+        self,
+        data,
+        name,
+        axis_name=None,
+        axis_unit=None,
+        value_name="Fraction",
+        value_unit=None,
+        update="to_data",
+        detect_axis_name_and_unit=False,
+        detect_value_name_and_unit=False,
+    ):
+        super().__init__(
+            data=data,
+            name=name,
+            axis_name=axis_name,
+            axis_unit=axis_unit,
+            update=update,
+            value_name=value_name,
+            value_unit=value_unit,
+            detect_axis_name_and_unit=detect_axis_name_and_unit,
+            detect_value_name_and_unit=detect_value_name_and_unit,
+        )
         if not axis_unit in chromatographic_units_map_types.keys():
-            raise ValueError(f"Expected axis_unit to be one of {chromatographic_units_map_types.keys()}, but got {axis_unit}")
-        
-        self.axis_unit = axis_unit
-        if not axis_type:
-            self.axis_type = chromatographic_units_map_types[axis_unit]
-        else:
-            self.axis_type = axis_type
-            
-        self.value_type = "Fraction"
-        self.value_unit = None
+            raise ValueError(
+                f"Expected axis_unit to be one of {chromatographic_units_map_types.keys()}, but got {axis_unit}"
+            )
+
+        if axis_name == "undefined":
+            self.set_axis_name(chromatographic_units_map_types[axis_unit])

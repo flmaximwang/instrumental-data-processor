@@ -11,6 +11,17 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Python: Unittest",
+            "type": "python",
+            "request": "launch",
+            "module": "unittest",
+            "args": [
+                "-v",
+                "abstracts_test"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }
