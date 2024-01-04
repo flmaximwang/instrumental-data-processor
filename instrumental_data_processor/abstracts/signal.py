@@ -9,7 +9,7 @@ import instrumental_data_processor.utils.path_utils as path_utils
 
 class DescriptionAnnotation:
     """
-    Every signal contains multiple descriptions.
+    Every signal contains multiple descriptions, which is continuous / discrete.
     This class is used to annotate each description for its
     type (like Volume), unit (like mL), limit (like (0, 10)) and ticks (like tick_number = 5)
     """
@@ -39,8 +39,8 @@ class DescriptionAnnotation:
     def set_limit(self, limit):
         pass
 
-    def get_limit(self):
-        pass 
+    def get_limit(self) -> tuple[int | float, int | float]:
+        pass
     
     def set_tick_number(self, tick_number):
         pass
@@ -53,7 +53,7 @@ class DescriptionAnnotation:
 
     def get_tick_labels(self):
         pass
-class NumericDescriptionAnnotation(DescriptionAnnotation):
+class ContinuousDescriptionAnnotation(DescriptionAnnotation):
     
     def __init__(self, name: str, unit: str, limit: tuple[int | float, int | float], tick_number: int):
         super().__init__(name, unit)
@@ -86,7 +86,7 @@ class NumericDescriptionAnnotation(DescriptionAnnotation):
     def get_tick_labels(self, digits=1):
         return np.round(np.linspace(self.get_limit()[0], self.get_limit()[1], self.get_tick_number()), digits)
         
-class AnnotationDescriptionAnnotation(DescriptionAnnotation):
+class DiscreteDescriptionAnnotatoin(DescriptionAnnotation):
 
     def get_limit(self):
         return (0, 1)
@@ -102,8 +102,8 @@ class AnnotationDescriptionAnnotation(DescriptionAnnotation):
 
 class Signal:
     """
-    a signal is composed of multiple descriptions. These descriptions are represented
-    by columns in a pandas.DataFrame and therefore have equal lengths.
+    a signal is composed of multiple descriptions. At least one description is continuous for all instruments.
+    These descriptions are represented by columns in a pandas.DataFrame and therefore have equal lengths.
     More specific signals are subclasses that have defined descriptions.
     """
 
@@ -172,3 +172,16 @@ class Signal:
             )
         else:
             self.get_description_annotations_by_index(description_index).set_limit(limit)
+
+    def export(self, export_path, mode="write"):
+        directory = os.path.dirname(export_path)
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+        if os.path.exists(export_path):
+            if mode == "write":
+                raise Exception(f"File {export_path} already exists")
+            elif mode == "replace":
+                os.remove(export_path)
+            else:
+                raise ValueError("mode should be either 'write' or 'replace'")
+        self.get_data().to_csv(export_path)

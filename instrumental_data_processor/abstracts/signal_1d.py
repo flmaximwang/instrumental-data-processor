@@ -2,7 +2,7 @@ import typing
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
-from .signal import DescriptionAnnotation, Signal, AnnotationDescriptionAnnotation, NumericDescriptionAnnotation
+from .signal import DescriptionAnnotation, Signal, DiscreteDescriptionAnnotatoin, ContinuousDescriptionAnnotation
 from ..utils import path_utils, transform_utils
 
 chromatographic_units_map_types = {
@@ -22,7 +22,7 @@ units_map_types = [chromatographic_units_map_types, spectroscopic_units_map_type
 
 class Signal1D(Signal):
     """
-    1D signals are signals with two descriptions. The first is called axis, the second is called value.
+    1D signals are signals with two descriptions. The first is called axis (which is continuous), the second is called value (which may be continuous or discrete).
     Value describes the property of every point on the axis, like the absorbance of a sample at a certain wavelength.
     """
 
@@ -188,6 +188,12 @@ class Signal1D(Signal):
     def get_value_label(self):
         return self.get_description_annotations_by_index(1).get_label()
     
+    def get_axis_limit(self):
+        return self.get_limit(0)
+
+    def set_axis_limit(self, axis_limit):
+        self.set_limit(0, axis_limit)
+    
     def get_axis_ticks(self):
         return self.get_description_annotations_by_index(0).get_ticks()
     
@@ -249,14 +255,19 @@ class Signal1D(Signal):
         self.set_value_name(value_name)
         self.set_value_unit(value_unit)
 
-    def plot_at(self, ax: plt.Axes, label, **kwargs) -> plt.Axes:
-        pass
+    def plot_at(self, ax: plt.Axes, label=None, **kwargs):
+        '''
+        The method to plot a signal should only be implemented when the form of signal has been well defined.
+        Such a method should retrun a Line2D
+        '''
+        handle, = ax.plot([0], [0], label=label)
+        return handle
 
     def preview(self, export_path=None, **kwargs):
         if type(self) is Signal1D:
             raise TypeError("An abstract Signal1D should not be previewed.")
         fig, ax = plt.subplots(1, 1)
-        handle = self.plot_at(ax, label=self.get_name(), **kwargs)
+        handle = self.plot_at(ax, **kwargs)
         ax.set_xlabel(self.get_axis_label())
         ax.set_ylabel(self.get_value_label())
         ax.set_xlim(0, 1)
@@ -271,9 +282,9 @@ class Signal1D(Signal):
         else:
             plt.show()
 
-class NumericSignal1D(Signal1D):
+class ContinuousSignal1D(Signal1D):
     '''
-    NumericSignal1D 是 Signal1D 的子类, 用于表示 axis 与 value 都是数值的信号
+    NumericSignal1D 是 Signal1D 的子类, 用于表示 axis 与 value 都是连续
     '''
     
     def __init__(
@@ -302,13 +313,13 @@ class NumericSignal1D(Signal1D):
             detect_value_name_and_unit=detect_value_name_and_unit,
         )
         self.description_annotations = [
-            NumericDescriptionAnnotation(
+            ContinuousDescriptionAnnotation(
                 self.get_axis_name(),
                 self.get_axis_unit(),
                 (self.get_axis().min(), self.get_axis().max()),
                 10,
             ),
-            NumericDescriptionAnnotation(
+            ContinuousDescriptionAnnotation(
                 self.get_value_name(),
                 self.get_value_unit(),
                 (self.get_values().min(), self.get_values().max()),
@@ -332,12 +343,6 @@ class NumericSignal1D(Signal1D):
         )
 
         return copied_signal
-
-    def get_axis_limit(self):
-        return self.get_limit(0)
-
-    def set_axis_limit(self, axis_limit):
-        self.set_limit(0, axis_limit)
 
     def get_value_limit(self):
         return self.get_limit(1)
@@ -368,7 +373,7 @@ class NumericSignal1D(Signal1D):
         peak_value = self.get_values_between(start, end)[peak_idx]
         return (peak_axis, peak_value)
 
-    def plot_at(self, ax: plt.Axes, label, **kwargs):
+    def plot_at(self, ax: plt.Axes, label=None, **kwargs):
         """
         Plot the signal at the given ax and return an artist handle.
         You can provide extra arguments to the plot function by **kwargs. Available arguments are listed below:
@@ -381,6 +386,8 @@ class NumericSignal1D(Signal1D):
         - horizontalalignment: center | right | left
         - verticalalignment: center | top | bottom
         """
+        if not label:
+            label = self.get_name()
         axis_to_plot = transform_utils.rescale_to_0_1(
             self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1]
         )
@@ -440,9 +447,9 @@ class NumericSignal1D(Signal1D):
         )
 
 
-class AnnotationSignal1D(Signal1D):
+class DiscreteSignal1D(Signal1D):
     '''
-    AnnotationSignal1D 是 Signal1D 的子类, 用于表示 axis 是数值, 但是 value 是注释的信号
+    AnnotationSignal1D 是 Signal1D 的子类, 用于表示 axis 是数值, 但是 value 离散的信号
     '''
     @classmethod
     def from_csv(
@@ -492,26 +499,20 @@ class AnnotationSignal1D(Signal1D):
             detect_value_name_and_unit=detect_value_name_and_unit
         )
         self.description_annotations = [
-            NumericDescriptionAnnotation(
+            ContinuousDescriptionAnnotation(
                 self.get_axis_name(),
                 self.get_axis_unit(),
                 (self.get_axis().min(), self.get_axis().max()),
                 10,
             ),
-            AnnotationDescriptionAnnotation(
+            DiscreteDescriptionAnnotatoin(
                 self.get_value_name(),
                 self.get_value_unit()
             ),
         ]
-    
-    def get_axis_limit(self):
-        return self.get_limit(0)
-
-    def set_axis_limit(self, axis_limit):
-        self.set_limit(0, axis_limit)
 
     def plot_at(
-        self, ax: plt.Axes, label, text_shift=(0, 0), mark_height=0.5, **kwargs
+        self, ax: plt.Axes, label=None, text_shift=(0, 0), mark_height=0.5, **kwargs
     ):
         """
         Plot the signal at the given ax and return an artist handle.
@@ -529,7 +530,6 @@ class AnnotationSignal1D(Signal1D):
         kwargs_for_Line2D = kwargs.copy()
         kwargs_for_Line2D.pop("rotation", None)
         axis_to_plot = transform_utils.rescale_to_0_1(self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1])
-        print(axis_to_plot)
         ax.vlines(axis_to_plot, 0, mark_height, **kwargs_for_Line2D)
         for axis, value in zip(axis_to_plot, self.get_values()):
             ax.annotate(
@@ -549,7 +549,7 @@ class AnnotationSignal1D(Signal1D):
         )  # Generate a virtural handle for legend
         return handle
 
-class FractionSignal(AnnotationSignal1D):
+class FractionSignal(DiscreteSignal1D):
     @classmethod
     def from_csv(
         cls,
