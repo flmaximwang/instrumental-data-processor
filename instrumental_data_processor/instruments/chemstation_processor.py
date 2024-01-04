@@ -83,7 +83,9 @@ class ChemStationChromatography(Signal1DCollection):
         if name:
             chromatogram = ChemStationChromatography(signals, name=name)
         else:
-            chromatogram = ChemStationChromatography(signals, name=path_utils.get_name_from_path(directory))
+            if directory.endswith("/"):
+                directory = directory[:-1]
+            chromatogram = ChemStationChromatography(signals, name=path_utils.get_name_from_path(directory, extension=False))
             
         return chromatogram
     

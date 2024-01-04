@@ -28,6 +28,13 @@ class Signal1DCollection(SignalCollection):
         self.axis_unit = main_signal.get_axis_unit()
         self.axis_tick_number = 11
         
+    def rename_signal(self, old_signal_name, new_signal_name):
+        super().rename_signal(old_signal_name=old_signal_name, new_signal_name=new_signal_name)
+        if self.main_signal_name == old_signal_name:
+            self.set_main_signal(new_signal_name, update_axis=True)
+        if old_signal_name in self.visible_signal_names:
+            self.visible_signal_names[self.visible_signal_names.index(old_signal_name)] = new_signal_name
+    
     def set_figsize(self, figsize):
         self.figsize = figsize
         
@@ -138,9 +145,7 @@ class Signal1DCollection(SignalCollection):
         for i, signal_name in enumerate(self.visible_signal_names):
             signal = self.signals[signal_name]
             tick_weight = dict(size=4, width=1.5)
-            print(signal_name)
             if i > 0:
-                print(1)
                 if isinstance(self.signals[signal_name], ContinuousSignal1D):
                     twins.append(ax.twinx())
                     twins[-1].spines.right.set_position(("axes", 1 + axis_shift * counter))
@@ -206,5 +211,6 @@ class Signal1DCollection(SignalCollection):
             fig, axes = self.plot_with_denoted_axis()
         else:
             raise Exception("Unknown display mode")
+        axes[0].set_title(self.get_name())
 
         return fig, axes

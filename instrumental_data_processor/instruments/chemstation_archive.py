@@ -700,7 +700,6 @@ class Chromatogram:
 
     def export(self, directory="."):
         directory = os.path.join(directory, self.get_name())
-        print(directory)
         if not os.path.exists(directory):
             os.makedirs(directory)
         for signal in self.signals:

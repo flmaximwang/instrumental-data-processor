@@ -46,6 +46,12 @@ class SignalCollection:
     
     def __setitem__(self, signal_name: str, signal: Signal):
         self.set_signal(signal_name, signal)
+
+    def rename_signal(self, old_signal_name, new_signal_name):
+        if new_signal_name in self.signals.keys():
+            raise ValueError(f"Signal name {new_signal_name} already exists in the collection")
+        self.signals[new_signal_name] = self.signals.pop(old_signal_name)
+        self.signals[new_signal_name].set_name(new_signal_name)
     
     def export(self, directory, mode='write'):
         if not os.path.exists(directory):

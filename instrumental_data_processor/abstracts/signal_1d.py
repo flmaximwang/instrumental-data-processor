@@ -399,7 +399,7 @@ class ContinuousSignal1D(Signal1D):
             self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1]
         )
         values_to_plot = transform_utils.rescale_to_0_1(
-            self.get_values(), self.get_values().min(), self.get_values().max()
+            self.get_values(), self.get_value_limit()[0], self.get_value_limit()[1]
         )
         handle, = ax.plot(axis_to_plot, values_to_plot, label=label, **kwargs_for_Line2D)
         return handle
@@ -421,39 +421,40 @@ class ContinuousSignal1D(Signal1D):
         peak_axis, peak_value = self.get_peak_between(start, end)
         axis_limit = self.get_axis_limit()
         value_limit = self.get_value_limit()
-        peak_axis = transform_utils.rescale_to_0_1(peak_axis, axis_limit[0], axis_limit[1])
-        peak_value = transform_utils.rescale_to_0_1(peak_value, value_limit[0], value_limit[1])
+        rescaled_peak_axis = transform_utils.rescale_to_0_1(peak_axis, axis_limit[0], axis_limit[1])
+        rescaled_peak_value = transform_utils.rescale_to_0_1(peak_value, value_limit[0], value_limit[1])
         if type == "vline":
             self._plot_peak_at_with_vline(
-                ax, peak_axis, peak_value, text_shift, **kwargs
+                ax,
+                rescaled_peak_axis=rescaled_peak_axis,
+                rescaled_peak_value=rescaled_peak_value,
+                peak_axis=peak_axis,
+                peak_value=peak_value,
+                text_shift=text_shift,
+                **kwargs
             )
         elif type == "annotation":
-            self._plot_peak_at_with_annotation(ax, peak_axis, peak_value, **kwargs)
+            self._plot_peak_at_with_annotation(ax, peak_axis, peak_value, text_shift=text_shift, **kwargs)
 
     def _plot_peak_at_with_vline(
-        self, ax: plt.Axes, peak_axis, peak_value, text_shift, **kwargs
+        self, ax: plt.Axes, rescaled_peak_axis, rescaled_peak_value, peak_axis, peak_value, text_shift, **kwargs
     ):
         linestyle = kwargs.pop("linestyle", "dashed")
-        ax.vlines(peak_axis, 0, peak_value, linestyles=linestyle, **kwargs)
+        ax.vlines(rescaled_peak_axis, 0, rescaled_peak_value, linestyles=linestyle, **kwargs)
         ax.annotate(
             f"{peak_axis:.2f} {self.get_axis_unit()}",
-            xy=(peak_axis, peak_value),
-            xytext=(peak_axis + text_shift[0], peak_value + text_shift[1]),
+            xy=(rescaled_peak_axis, rescaled_peak_value),
+            xytext=(rescaled_peak_axis + text_shift[0], rescaled_peak_value + text_shift[1]),
             **kwargs,
         )
 
     def _plot_peak_at_with_annotation(
-        self, ax: plt.Axes, peak_axis, peak_value, *args, **kwargs
+        self, ax: plt.Axes, rescaled_peak_axis, rescaled_peak_value, peak_axis, peak_value, text_shift, **kwargs
     ):
         ax.annotate(
             f"{peak_axis:.2f} {self.axis_unit}",
             xy=(peak_axis, peak_value),
-            xytext=(peak_axis, peak_value * 1.1),
-            arrowprops=dict(
-                arrowstyle="-",
-                color=kwargs.get("color", "black"),
-                linewidth=kwargs.get("linewidth", 1),
-            ),
+            xytext=(rescaled_peak_axis + text_shift[0], rescaled_peak_value + text_shift[1]),
             **kwargs,
         )
     
