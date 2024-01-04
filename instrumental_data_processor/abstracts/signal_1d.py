@@ -386,6 +386,13 @@ class ContinuousSignal1D(Signal1D):
         - horizontalalignment: center | right | left
         - verticalalignment: center | top | bottom
         """
+        kwargs.pop("text_shift", None)
+        kwargs_for_annotate = kwargs.copy()
+        kwargs_for_Line2D = kwargs.copy()
+        
+        kwargs_for_Line2D.pop("fontsize", None)
+        kwargs_for_Line2D.pop("rotation", None)
+        
         if not label:
             label = self.get_name()
         axis_to_plot = transform_utils.rescale_to_0_1(
@@ -394,7 +401,7 @@ class ContinuousSignal1D(Signal1D):
         values_to_plot = transform_utils.rescale_to_0_1(
             self.get_values(), self.get_values().min(), self.get_values().max()
         )
-        (handle,) = ax.plot(axis_to_plot, values_to_plot, label=label, **kwargs)
+        handle, = ax.plot(axis_to_plot, values_to_plot, label=label, **kwargs_for_Line2D)
         return handle
 
     def plot_peak_at(
@@ -412,6 +419,10 @@ class ContinuousSignal1D(Signal1D):
         - verticalalignment: center | top | bottom
         """
         peak_axis, peak_value = self.get_peak_between(start, end)
+        axis_limit = self.get_axis_limit()
+        value_limit = self.get_value_limit()
+        peak_axis = transform_utils.rescale_to_0_1(peak_axis, axis_limit[0], axis_limit[1])
+        peak_value = transform_utils.rescale_to_0_1(peak_value, value_limit[0], value_limit[1])
         if type == "vline":
             self._plot_peak_at_with_vline(
                 ax, peak_axis, peak_value, text_shift, **kwargs
@@ -425,7 +436,7 @@ class ContinuousSignal1D(Signal1D):
         linestyle = kwargs.pop("linestyle", "dashed")
         ax.vlines(peak_axis, 0, peak_value, linestyles=linestyle, **kwargs)
         ax.annotate(
-            f"{peak_axis:.2f} {self.axis_unit}",
+            f"{peak_axis:.2f} {self.get_axis_unit()}",
             xy=(peak_axis, peak_value),
             xytext=(peak_axis + text_shift[0], peak_value + text_shift[1]),
             **kwargs,
@@ -445,6 +456,35 @@ class ContinuousSignal1D(Signal1D):
             ),
             **kwargs,
         )
+    
+    def integrate_between(self, start, end):
+        signal_data:pd.DataFrame = self.get_signal(signal)
+        signal_data = signal_data[(signal_data.iloc[:, 0] >= start) & (signal_data.iloc[:, 0] <= end)]
+        
+        if not isinstance(baseline, Iterable):
+            baseline = np.array([baseline for _ in range(len(signal_data))])
+        else:
+            if len(baseline) != len(signal_data):
+                print("Baseline length should be equal to the length of signal data")
+                return None
+            else:
+                baseline = np.array(baseline)
+        
+        signal_height = signal_data.iloc[:, 1] - baseline
+        peak_area = np.trapz(signal_height, signal_data.iloc[:, 0])
+        
+        if ax:
+            ax.vlines([start, end], 0, 1, colors=color, linestyles=linestyles, linewidths=linewidths, alpha=max(1, alpha*2))
+            ax.fill_between(signal_data.iloc[:, 0],
+                rescale_signal(baseline, self.y_limits[signal][0], self.y_limits[signal][1]),
+                rescale_signal(signal_data.iloc[:, 1].copy(), self.y_limits[signal][0], self.y_limits[signal][1]),
+                color=color, alpha=alpha
+            )
+        print("Peak area = {} {}·ml from {} ml to {} ml".format(peak_area, signal_data.columns[1], start, end))
+        
+        return peak_area
+    
+    
 
 
 class DiscreteSignal1D(Signal1D):
@@ -510,6 +550,7 @@ class DiscreteSignal1D(Signal1D):
                 self.get_value_unit()
             ),
         ]
+        self.arrowprops = {}
 
     def plot_at(
         self, ax: plt.Axes, label=None, text_shift=(0, 0), mark_height=0.5, **kwargs
@@ -526,9 +567,18 @@ class DiscreteSignal1D(Signal1D):
         - horizontalalignment: center | right | left
         - verticalalignment: center | top | bottom
         """
+        if not label:
+            label = self.get_name()
+        
         kwargs_for_annotate = kwargs.copy()
+        if not "rotation" in kwargs_for_annotate.keys():
+            kwargs_for_annotate["rotation"] = 90 
+        if not "fontsize" in kwargs_for_annotate.keys():
+            kwargs_for_annotate["fontsize"] = 10
+        
         kwargs_for_Line2D = kwargs.copy()
         kwargs_for_Line2D.pop("rotation", None)
+        kwargs_for_Line2D.pop("fontsize", None)
         axis_to_plot = transform_utils.rescale_to_0_1(self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1])
         ax.vlines(axis_to_plot, 0, mark_height, **kwargs_for_Line2D)
         for axis, value in zip(axis_to_plot, self.get_values()):
@@ -536,18 +586,20 @@ class DiscreteSignal1D(Signal1D):
                 f"{value}",
                 xy=(axis, mark_height),
                 xytext=(axis + text_shift[0], 0.5 + text_shift[1]),
-                arrowprops=dict(
-                    arrowstyle="-",
-                    color=kwargs.get("color", "black"),
-                    linewidth=kwargs.get("linewidth", 1),
-                ),
+                ha="center",
                 **kwargs_for_annotate,
             )
 
         handle = plt.Line2D(
             [0], [0], label=label, **kwargs_for_Line2D
-        )  # Generate a virtural handle for legend
+        )  # Generate a virtual handle for legend
         return handle
+    
+    def set_arrowprops(self, arrowprops):
+        '''
+        Set the arrowprops for annotations. See ax.annotate for supported arrowprops
+        '''
+        self.arrowprops = arrowprops
 
 class FractionSignal(DiscreteSignal1D):
     @classmethod

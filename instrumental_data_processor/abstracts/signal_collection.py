@@ -18,6 +18,7 @@ class SignalCollection:
                 self.signals[signal_name] = signal
             else:
                 raise ValueError(f"Signal name {signal_name} already exists in the collection")
+        self.name = name
         
     def get_name(self):
         return self.name

@@ -80,9 +80,12 @@ class ChemStationChromatography(Signal1DCollection):
                     signals.append(ChemStationChromatographyFractionSignal.from_raw_export(os.path.join(directory, file_name)))
                 else:
                     signals.append(ChemStationChromatographyNumericSignal.from_raw_export(os.path.join(directory, file_name)))
-        chromatography = ChemStationChromatography(signals)
         if name:
-            chromatography.set_name(name)
+            chromatogram = ChemStationChromatography(signals, name=name)
         else:
-            chromatography.set_name(path_utils.get_name_from_path(directory))
-        return chromatography
+            chromatogram = ChemStationChromatography(signals, name=path_utils.get_name_from_path(directory))
+            
+        return chromatogram
+    
+    def __init__(self, signals, name="Default ChemStation Chromatogram"):
+        super().__init__(signals, name=name)

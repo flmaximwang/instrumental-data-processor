@@ -32,15 +32,27 @@ class TestChemStationChromatography(unittest.TestCase):
         chemstation_chromatography = instruments.ChemStationChromatography.from_raw_directory(
             'tests/data/chemstation_chromatography_1'
         )
-        print(chemstation_chromatography.main_signal_name)
-        print(chemstation_chromatography.visible_signal_names)
         chemstation_chromatography.set_figsize((15, 5))
-        print(chemstation_chromatography.figsize)
         chemstation_chromatography.align_signal_axes((0, 30))
         chemstation_chromatography.set_main_signal("280")
         chemstation_chromatography.set_visible_signals("280", "214")
         chemstation_chromatography.set_display_mode(0)
         chemstation_chromatography.plot()
+
+class TestUnicornChrom(unittest.TestCase):
+    
+    def test_read_and_export(self):
+        unicorn_chroms = instruments.read_uni_chroms_from_raw_export('tests/data/unicorn_chrom_1.txt')
+        unicorn_chrom = unicorn_chroms[0]
+        unicorn_chrom.set_figsize((25, 5))
+        fig, axes = unicorn_chrom.plot(fontsize=5)
+        fig.savefig("/Users/maxim/Documents/VSCode/instrumental-data-processer/tests/out/unicorn_chrom_1_preview_with_UnicornChrom.png")
+        unicorn_chrom.set_display_mode(1)
+        unicorn_chrom.align_signal_axes((0, 30))
+        fig, axes = unicorn_chrom.plot(fontsize=10, axis_shift=0.04)
+        a: instruments.UnicornContinuousSignal1D = unicorn_chrom["UV"]
+        a.plot_peak_at(axes[0], 10, 15)
+        fig.savefig("/Users/maxim/Documents/VSCode/instrumental-data-processer/tests/out/unicorn_chrom_1_preview_with_UnicornChrom_all_values.png")
 
 if __name__ == '__main__':
     unittest.main()

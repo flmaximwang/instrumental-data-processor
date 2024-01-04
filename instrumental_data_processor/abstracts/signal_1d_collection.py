@@ -100,12 +100,13 @@ class Signal1DCollection(SignalCollection):
     def get_axis_ticklabels(self):
         lower_limit, upper_limit = self.get_axis_limit()
         tick_number = self.get_axis_tick_number()
-        return np.linspace(lower_limit, upper_limit, tick_number)
+        return np.round(np.linspace(lower_limit, upper_limit, tick_number), 1)
         
     def set_display_mode(self, display_mode):
         self.display_mode = display_mode
         
     def plot_with_main_signal_value_label(self, **kwargs):
+        
         ax: plt.Axes
         fig, ax = self.subplots(1, 1)
         axes = [ax]
@@ -125,33 +126,35 @@ class Signal1DCollection(SignalCollection):
         ax.set_ylabel(main_signal.get_value_label())
         ax.legend(handles = handles)
         ax.set_title(self.get_name())
-        
+        fig.tight_layout()
         return fig, axes
     
     def plot_with_all_value_labels(self, axis_shift, **kwargs):
         ax: plt.Axes
         fig, ax = self.subplots(1, 1)
         twins: list[plt.Axes] = []
-        handles = list[plt.Line2D]
+        handles: list[plt.Line2D] = []
         counter = 0
         for i, signal_name in enumerate(self.visible_signal_names):
             signal = self.signals[signal_name]
             tick_weight = dict(size=4, width=1.5)
+            print(signal_name)
             if i > 0:
+                print(1)
                 if isinstance(self.signals[signal_name], ContinuousSignal1D):
                     twins.append(ax.twinx())
                     twins[-1].spines.right.set_position(("axes", 1 + axis_shift * counter))
                     counter += 1
                     ax_to_plot = twins[-1]
                     handle = signal.plot_at(ax_to_plot, color=f"C{i}", **kwargs)
-                    ax_to_plot.set_xlim(self.get_axis_limit)
+                    ax_to_plot.set_xlim([0, 1])
                     ax_to_plot.set_ylim([0, 1])
                     
                     ax_to_plot.set_ylabel(self.signals[signal_name].get_value_label())
                     ax_to_plot.yaxis.label.set_color(handle.get_color())
                     
                     ax_to_plot.tick_params(axis='y', colors=handle.get_color(), **tick_weight)
-                    yticks, yticklabels = self.signals[signal_name].get_value_ticks(), self.signals[signal_name].get_value_tick_labels()
+                    yticks, yticklabels = signal.get_value_ticks(), signal.get_value_tick_labels()
                     ax_to_plot.set_yticks(yticks)
                     ax_to_plot.set_yticklabels(yticklabels)
                 else:
@@ -172,15 +175,16 @@ class Signal1DCollection(SignalCollection):
                     ax_to_plot.set_yticklabels(yticklabels)
                 else:
                     raise TypeError("The first signal should be a ContinuousSignal1D")
-            handles.append(handle)
-            
+            handles.append(handle)    
         ax.set_xlabel(self.get_axis_label())
-        xticks, xticklabels = self.get_x_ticks()
+        xticks, xticklabels = self.get_axis_ticks(), self.get_axis_ticklabels()
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)
         ax.legend(handles=handles)
         ax.set_title(self.get_name())
-            
+        fig.tight_layout()
+        # 避免右侧额外的坐标轴跑到画布以外
+        fig.subplots_adjust(right=1 - axis_shift * counter)
         return fig, [ax] + twins
     
     def plot_separately(self) -> tuple[plt.Figure, list[plt.Axes]]:
@@ -189,10 +193,10 @@ class Signal1DCollection(SignalCollection):
     def plot_with_denoted_axis(self) -> tuple[plt.Figure, list[plt.Axes]]:
         return plt.subplots(1, 1)
         
-    def plot(self, export_path: str | None = None, **kwargs) -> None:
+    def plot(self, **kwargs) -> None:
         axes: list[plt.Axes]
         if self.display_mode == 0:
-            fig, axes = self.plot_with_main_signal_value_label()
+            fig, axes = self.plot_with_main_signal_value_label(**kwargs)
         elif self.display_mode == 1:
             axis_shift = kwargs.pop("axis_shift", 0.2)
             fig, axes = self.plot_with_all_value_labels(axis_shift=axis_shift, **kwargs)
@@ -202,7 +206,5 @@ class Signal1DCollection(SignalCollection):
             fig, axes = self.plot_with_denoted_axis()
         else:
             raise Exception("Unknown display mode")
-        if not export_path:
-            plt.show()
-        else:
-            fig.savefig(export_path)
+
+        return fig, axes
