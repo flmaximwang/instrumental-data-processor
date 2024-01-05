@@ -58,6 +58,15 @@ class Signal1DCollection(SignalCollection):
         if update_axis:
             self.update_axis_name_and_unit_from_main_signal()
     
+    def keys(self):
+        return self.get_available_signals()
+    
+    def get_available_signals(self):
+        return self.signals.keys()
+    
+    def __iter__(self):
+        return self.signals.__iter__()
+    
     def set_visible_signals(self, *signal_names):
         self.visible_signal_names = list(signal_names)
     

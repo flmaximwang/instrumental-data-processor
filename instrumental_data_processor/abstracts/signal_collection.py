@@ -69,3 +69,9 @@ class SignalCollection:
                 raise ValueError(f"Invalid mode {mode}, should be either 'write', 'append' or 'replace'")
         for signal in self.signals.values():
             signal.export(os.path.join(directory, signal.get_name() + ".csv"), mode=mode)
+    
+    def copy(self):
+        signals: list[Signal] = []
+        for signal in self.signals.values():
+            signals.append(signal.copy())
+        return type(self)(signals, name=self.get_name())

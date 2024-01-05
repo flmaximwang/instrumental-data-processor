@@ -1,6 +1,7 @@
 import typing
 import re
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from .signal import DescriptionAnnotation, Signal, DiscreteDescriptionAnnotatoin, ContinuousDescriptionAnnotation
 from ..utils import path_utils, transform_utils
@@ -331,18 +332,24 @@ class ContinuousSignal1D(Signal1D):
         copied_signal = type(self)(
             data=self.get_data().copy(),
             name=self.get_name(),
-            axis_type=self.get_axis_name(),
+            axis_name=self.get_axis_name(),
             axis_unit=self.get_axis_unit(),
-            value_type=self.get_value_name(),
+            value_name=self.get_value_name(),
             value_unit=self.get_value_unit(),
             update="to_data",
-            detect_axis_type_and_unit=False,
-            detect_value_type_and_unit=False,
+            detect_axis_name_and_unit=False,
+            detect_value_name_and_unit=False,
             axis_limit=self.get_axis_limit(),
             value_limit=self.get_value_limit(),
         )
 
         return copied_signal
+    
+    def get_value_at_axis(self, axis):
+        '''
+        使用 1 次插值获取任意 axis 处的值
+        '''
+        return np.interp(axis, self.get_axis(), self.get_values())
 
     def get_value_limit(self):
         return self.get_limit(1)

@@ -4,7 +4,7 @@ from instrumental_data_processor.abstracts.signal_1d import ContinuousSignal1D, 
 from instrumental_data_processor.abstracts.signal_1d_collection import Signal1DCollection
 from instrumental_data_processor.utils import path_utils
 
-class ChemStationChromatographyNumericSignal(ContinuousSignal1D):
+class ChemStSig(ContinuousSignal1D):
     
     @staticmethod
     def from_raw_export(file_path: str):
@@ -18,7 +18,7 @@ class ChemStationChromatographyNumericSignal(ContinuousSignal1D):
             raise ValueError(f"File {file_path} is a fraction file, use ChemStationChromatographyFractionSignal.from_raw_export instead")
         signal_data = pd.read_csv(file_path, header=None, encoding="utf-16 LE", sep="\t")
         value_name = path_utils.get_name_from_path(file_path)
-        signal = ChemStationChromatographyNumericSignal(
+        signal = ChemStSig(
             data = signal_data,
             name = value_name,
             axis_name = "Time",
@@ -28,7 +28,7 @@ class ChemStationChromatographyNumericSignal(ContinuousSignal1D):
         )
         return signal
 
-class ChemStationChromatographyFractionSignal(FractionSignal):
+class ChemStFrac(FractionSignal):
     
     @staticmethod
     def from_raw_export(file_path: str):
@@ -55,7 +55,7 @@ class ChemStationChromatographyFractionSignal(FractionSignal):
                 "Fraction": "waste"
             })
             signal_data = pd.concat([signal_data, row1, row2], ignore_index=True)
-        signal = ChemStationChromatographyFractionSignal(
+        signal = ChemStFrac(
             data = signal_data,
             name = "Fraction",
             axis_name = "Time",
@@ -65,7 +65,7 @@ class ChemStationChromatographyFractionSignal(FractionSignal):
         )
         return signal
 
-class ChemStationChromatography(Signal1DCollection):
+class ChemStChrom(Signal1DCollection):
     
     @staticmethod
     def from_raw_directory(directory, name=None):
@@ -77,15 +77,15 @@ class ChemStationChromatography(Signal1DCollection):
         for file_name in os.listdir(directory):
             if file_name.endswith(".csv") or file_name.endswith(".CSV"):
                 if file_name in ["Fraction.csv", "fraction.csv", "Fraction.CSV", "fraction.CSV"]:
-                    signals.append(ChemStationChromatographyFractionSignal.from_raw_export(os.path.join(directory, file_name)))
+                    signals.append(ChemStFrac.from_raw_export(os.path.join(directory, file_name)))
                 else:
-                    signals.append(ChemStationChromatographyNumericSignal.from_raw_export(os.path.join(directory, file_name)))
+                    signals.append(ChemStSig.from_raw_export(os.path.join(directory, file_name)))
         if name:
-            chromatogram = ChemStationChromatography(signals, name=name)
+            chromatogram = ChemStChrom(signals, name=name)
         else:
             if directory.endswith("/"):
                 directory = directory[:-1]
-            chromatogram = ChemStationChromatography(signals, name=path_utils.get_name_from_path(directory, extension=False))
+            chromatogram = ChemStChrom(signals, name=path_utils.get_name_from_path(directory, extension=False))
             
         return chromatogram
     
