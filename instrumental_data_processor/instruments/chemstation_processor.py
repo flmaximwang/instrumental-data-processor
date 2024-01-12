@@ -68,7 +68,7 @@ class ChemStFrac(FractionSignal):
 class ChemStChrom(Signal1DCollection):
     
     @staticmethod
-    def from_raw_directory(directory, name=None):
+    def from_exported_directory(directory, name=None):
         '''
         从一个包含 Chemstation 导出数据的目录中读取数据
         '''

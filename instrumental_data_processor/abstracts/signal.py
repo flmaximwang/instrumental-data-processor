@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import instrumental_data_processor.utils.path_utils as path_utils
 
 
-class DescriptionAnnotation:
+class DescAnno:
     """
     Every signal contains multiple descriptions, which is continuous / discrete.
     This class is used to annotate each description for its
@@ -53,7 +53,10 @@ class DescriptionAnnotation:
 
     def get_tick_labels(self):
         pass
-class ContinuousDescriptionAnnotation(DescriptionAnnotation):
+
+    def copy(self):
+        return self.__class__(self.get_name(), self.get_unit())
+class ContDescAnno(DescAnno):
     
     def __init__(self, name: str, unit: str, limit: tuple[int | float, int | float], tick_number: int):
         super().__init__(name, unit)
@@ -85,8 +88,11 @@ class ContinuousDescriptionAnnotation(DescriptionAnnotation):
 
     def get_tick_labels(self, digits=1):
         return np.round(np.linspace(self.get_limit()[0], self.get_limit()[1], self.get_tick_number()), digits)
+    
+    def copy(self):
+        return self.__class__(self.get_name(), self.get_unit(), self.get_limit(), self.get_tick_number())
         
-class DiscreteDescriptionAnnotatoin(DescriptionAnnotation):
+class DiscDescAnno(DescAnno):
 
     def get_limit(self):
         return (0, 1)
@@ -99,6 +105,9 @@ class DiscreteDescriptionAnnotatoin(DescriptionAnnotation):
 
     def get_tick_labels(self):
         return [""]
+    
+    def copy(self):
+        return self.__class__(self.get_name(), self.get_unit())
 
 class Signal:
     """
@@ -135,7 +144,7 @@ class Signal:
         self.data = data
         self.name = name
         # axis_annotations are annotations that describe each axis
-        self.description_annotations: list[DescriptionAnnotation] = []
+        self.description_annotations: list[DescAnno] = []
 
     def set_name(self, name):
         self.name = name
@@ -154,7 +163,7 @@ class Signal:
 
     def get_description_annotations_by_index(
         self, description_index: str
-    ) -> DescriptionAnnotation:
+    ) -> DescAnno:
         return self.description_annotations[description_index]
 
     def get_limit(self, description_index):

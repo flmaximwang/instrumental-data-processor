@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from .signal import DescriptionAnnotation, Signal, DiscreteDescriptionAnnotatoin, ContinuousDescriptionAnnotation
+from .signal import * 
 from ..utils import path_utils, transform_utils
 
 chromatographic_units_map_types = {
@@ -98,8 +98,8 @@ class Signal1D(Signal):
                 value_name = self.get_data().columns[1]
             value_unit = value_unit
         self.description_annotations = [
-            DescriptionAnnotation(axis_name, axis_unit),
-            DescriptionAnnotation(value_name, value_unit),
+            DescAnno(axis_name, axis_unit),
+            DescAnno(value_name, value_unit),
         ]
         self.set_axis_name(axis_name)
         self.set_axis_unit(axis_unit)
@@ -314,13 +314,13 @@ class ContinuousSignal1D(Signal1D):
             detect_value_name_and_unit=detect_value_name_and_unit,
         )
         self.description_annotations = [
-            ContinuousDescriptionAnnotation(
+            ContDescAnno(
                 self.get_axis_name(),
                 self.get_axis_unit(),
                 (self.get_axis().min(), self.get_axis().max()),
                 10,
             ),
-            ContinuousDescriptionAnnotation(
+            ContDescAnno(
                 self.get_value_name(),
                 self.get_value_unit(),
                 (self.get_values().min(), self.get_values().max()),
@@ -415,6 +415,7 @@ class ContinuousSignal1D(Signal1D):
         self, ax: plt.Axes, start, end, type="vline", text_shift=(0, 0), **kwargs
     ):
         """
+        type can be "vline" or "annotation"
         You can provide extra arguments to the plot function by **kwargs. Available arguments are listed below:
         - color: str
         - linewidth: float
@@ -441,7 +442,15 @@ class ContinuousSignal1D(Signal1D):
                 **kwargs
             )
         elif type == "annotation":
-            self._plot_peak_at_with_annotation(ax, peak_axis, peak_value, text_shift=text_shift, **kwargs)
+            self._plot_peak_at_with_annotation(
+                ax,
+                peak_axis=peak_axis,
+                peak_value=peak_value,
+                rescaled_peak_axis=rescaled_peak_axis,
+                rescaled_peak_value=rescaled_peak_value,
+                text_shift=text_shift,
+                **kwargs
+            )
 
     def _plot_peak_at_with_vline(
         self, ax: plt.Axes, rescaled_peak_axis, rescaled_peak_value, peak_axis, peak_value, text_shift, **kwargs
@@ -459,8 +468,8 @@ class ContinuousSignal1D(Signal1D):
         self, ax: plt.Axes, rescaled_peak_axis, rescaled_peak_value, peak_axis, peak_value, text_shift, **kwargs
     ):
         ax.annotate(
-            f"{peak_axis:.2f} {self.axis_unit}",
-            xy=(peak_axis, peak_value),
+            f"{peak_axis:.2f} {self.get_axis_unit()}",
+            xy=(rescaled_peak_axis, rescaled_peak_value),
             xytext=(rescaled_peak_axis + text_shift[0], rescaled_peak_value + text_shift[1]),
             **kwargs,
         )
@@ -547,13 +556,13 @@ class DiscreteSignal1D(Signal1D):
             detect_value_name_and_unit=detect_value_name_and_unit
         )
         self.description_annotations = [
-            ContinuousDescriptionAnnotation(
+            ContDescAnno(
                 self.get_axis_name(),
                 self.get_axis_unit(),
                 (self.get_axis().min(), self.get_axis().max()),
                 10,
             ),
-            DiscreteDescriptionAnnotatoin(
+            DiscDescAnno(
                 self.get_value_name(),
                 self.get_value_unit()
             ),
@@ -588,7 +597,7 @@ class DiscreteSignal1D(Signal1D):
         kwargs_for_Line2D.pop("rotation", None)
         kwargs_for_Line2D.pop("fontsize", None)
         axis_to_plot = transform_utils.rescale_to_0_1(self.get_axis(), self.get_axis_limit()[0], self.get_axis_limit()[1])
-        ax.vlines(axis_to_plot, 0, mark_height, **kwargs_for_Line2D)
+        ax.vlines(axis_to_plot, 0, mark_height, linestyles="dashed", **kwargs_for_Line2D)
         for axis, value in zip(axis_to_plot, self.get_values()):
             ax.annotate(
                 f"{value}",

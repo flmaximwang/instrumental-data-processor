@@ -1,32 +1,124 @@
 from typing import Mapping
 import numpy as np
-from instrumental_data_processor.abstracts.signal_1d import Signal1D
 from .signal_collection import SignalCollection
 from .signal_1d import Signal1D, ContinuousSignal1D
+from .signal import ContDescAnno, DiscDescAnno
 import matplotlib.pyplot as plt
 
 class Signal1DCollection(SignalCollection):
     
     display_modes = ["main_signal_axis", "all_axis", "separate", "denoted_axis"]
     
-    def __init__(self, signals: list[Signal1D] = [], name="Default Signal1DCollection") -> None:
+    def __init__(
+            self,
+            signals: list[Signal1D] = [],
+            name="Default Signal1DCollection",
+            main_signal_name: str = None,
+            visible_signal_names: list[str] = None,
+            display_mode: str = None,
+            figsize=None,
+            axis_description: ContDescAnno = None,
+            value_description: ContDescAnno or DiscDescAnno = None,
+        ) -> None:
         for signal in signals:
             if not isinstance(signal, Signal1D):
                 raise TypeError(f"Signal {signal} is not a Signal1D")
         self.signals: Mapping[str, Signal1D] = {}
         super().__init__(signals, name=name)
-        self.set_default_parameters()
         
-    def set_default_parameters(self) -> None:
-        self.main_signal_name: str = list(self.signals.keys())[0]
-        self.visible_signal_names: list[str] = list(self.signals.keys())
-        self.display_mode: str = 0 # See display_modes for its meaning
-        self.figsize = None
-        main_signal = self.signals[self.main_signal_name]
-        self.axis_limit = main_signal.get_axis_limit()
-        self.axis_name = main_signal.get_axis_name()
-        self.axis_unit = main_signal.get_axis_unit()
-        self.axis_tick_number = 11
+        self.main_signal_name: str = list(self.signals.keys())[0] if not main_signal_name else main_signal_name
+        self.visible_signal_names: list[str] = list(self.signals.keys()) if not visible_signal_names else visible_signal_names
+        self.display_mode: str = 0 if not display_mode else display_mode # See display_modes for its meaning
+        self.figsize = figsize
+        
+        if not axis_description:
+            main_signal = self.signals[self.main_signal_name]
+            axis_limit = main_signal.get_axis_limit()
+            axis_name = main_signal.get_axis_name()
+            axis_unit = main_signal.get_axis_unit()
+            axis_tick_number = 11
+            self.axis_description = ContDescAnno(axis_name, axis_unit, axis_limit, axis_tick_number)
+        else:
+            self.axis_description = axis_description.copy()
+            
+        if not value_description:
+            main_signal = self.signals[self.main_signal_name]
+            value_name = main_signal.get_value_name()
+            value_unit = main_signal.get_value_unit()
+            if isinstance(main_signal, ContinuousSignal1D):
+                value_limit = main_signal.get_value_limit()
+                value_tick_number = 11
+                self.value_description = ContDescAnno(value_name, value_unit, value_limit, value_tick_number)
+            else:
+                self.value_description = DiscDescAnno(value_name, value_unit)
+        
+    def get_axis_label(self):
+        return self.axis_description.get_label()
+    
+    def get_axis_name(self):
+        return self.axis_description.get_name()
+    
+    def set_axis_name(self, axis_name):
+        return self.axis_description.set_name(axis_name)
+    
+    def get_axis_unit(self):
+        return self.axis_description.get_unit()
+    
+    def set_axis_unit(self, axis_unit):
+        return self.axis_description.set_unit(axis_unit)
+    
+    def get_axis_limit(self):
+        return self.axis_description.get_limit()
+    
+    def set_axis_limit(self, axis_limit):
+        return self.axis_description.set_limit(axis_limit)
+    
+    def get_axis_ticks(self):
+        return self.axis_description.get_ticks()
+    
+    def get_axis_ticklabels(self):
+        return self.axis_description.get_tick_labels()
+    
+    def get_axis_tick_number(self):
+        return self.axis_description.get_tick_number()
+    
+    def set_axis_tick_number(self, tick_number):
+        return self.axis_description.set_tick_number(tick_number)
+    
+    def get_value_label(self):
+        return self.value_description.get_label()
+    
+    def get_value_name(self):
+        return self.value_description.get_name()
+    
+    def set_value_name(self, value_name):
+        return self.value_description.set_name(value_name)
+    
+    def get_value_unit(self):
+        return self.value_description.get_unit()
+    
+    def set_value_unit(self, value_unit):
+        return self.value_description.set_unit(value_unit)
+    
+    def set_value_limit(self, value_limit):
+        return self.value_description.set_limit(value_limit)
+    
+    def get_value_ticks(self):
+        return self.value_description.get_ticks()
+    
+    def get_value_ticklabels(self):
+        return self.value_description.get_tick_labels()
+    
+    def get_value_tick_number(self):
+        return self.value_description.get_tick_number()
+    
+    def set_value_tick_number(self, tick_number):
+        return self.value_description.set_tick_number(tick_number)
+    
+    def update_axis_name_and_unit_from_main_signal(self):
+        main_signal = self[self.main_signal_name]
+        self.set_axis_name(main_signal.get_axis_name())
+        self.set_axis_unit(main_signal.get_axis_unit())
         
     def rename_signal(self, old_signal_name, new_signal_name):
         super().rename_signal(old_signal_name=old_signal_name, new_signal_name=new_signal_name)
@@ -74,49 +166,6 @@ class Signal1DCollection(SignalCollection):
         for signal in self.signals.keys():
             self.signals[signal].set_axis_limit(axis_limit)
         self.axis_limit = axis_limit
-        
-    def get_axis_name(self):
-        return self.axis_name
-    
-    def set_axis_name(self, axis_name):
-        self.axis_name = axis_name
-        
-    def get_axis_unit(self):
-        return self.axis_unit
-    
-    def set_axis_unit(self, axis_unit):
-        self.axis_unit = axis_unit
-        
-    def get_axis_label(self):
-        if self.get_axis_unit() is None:
-            return self.get_axis_name()
-        else:
-            return f"{self.get_axis_name()} ({self.get_axis_unit()})"
-        
-    def update_axis_name_and_unit_from_main_signal(self):
-        main_signal = self[self.main_signal_name]
-        self.set_axis_name(main_signal.get_axis_name())
-        self.set_axis_unit(main_signal.get_axis_unit())
-    
-    def get_axis_limit(self):
-        return self.axis_limit
-    
-    def set_axis_limit(self, axis_limit):
-        self.axis_limit = axis_limit
-        
-    def set_axis_tick_number(self, axis_tick_number):
-        self.axis_tick_number = axis_tick_number
-        
-    def get_axis_tick_number(self):
-        return self.axis_tick_number
-        
-    def get_axis_ticks(self):
-        return np.linspace(0, 1, self.get_axis_tick_number())
-    
-    def get_axis_ticklabels(self):
-        lower_limit, upper_limit = self.get_axis_limit()
-        tick_number = self.get_axis_tick_number()
-        return np.round(np.linspace(lower_limit, upper_limit, tick_number), 1)
         
     def set_display_mode(self, display_mode):
         self.display_mode = display_mode
@@ -204,8 +253,28 @@ class Signal1DCollection(SignalCollection):
     def plot_separately(self) -> tuple[plt.Figure, list[plt.Axes]]:
         return plt.subplots(1, 1)
     
-    def plot_with_denoted_axis(self) -> tuple[plt.Figure, list[plt.Axes]]:
-        return plt.subplots(1, 1)
+    def plot_with_denoted_axis(self, **kwargs) -> tuple[plt.Figure, list[plt.Axes]]:
+
+        ax: plt.Axes
+        fig, ax = self.subplots(1, 1)
+        axes = [ax]
+        handles = []
+        for i, signal_name in enumerate(self.visible_signal_names):
+            signal = self.signals[signal_name]
+            handles.append(signal.plot_at(ax, color=f"C{i}", **kwargs))
+        xticks, xticklabels, yticks, yticklabels = self.get_axis_ticks(), self.get_axis_ticklabels(), self.get_value_ticks(), self.get_value_ticklabels()
+        ax.set_xticks(xticks)
+        ax.set_yticks(yticks)
+        ax.set_xticklabels(xticklabels)
+        ax.set_yticklabels(yticklabels)
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
+        ax.set_xlabel(self.get_axis_label())
+        ax.set_ylabel(self.get_value_label())
+        ax.legend(handles = handles)
+        ax.set_title(self.get_name())
+        fig.tight_layout()
+        return fig, axes
         
     def plot(self, **kwargs) -> None:
         axes: list[plt.Axes]
