@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "instrumental-data-analyzer"
+description = "A platform for analyzing instrumental data"
+authors = [
+    "Maxim Wang <wangfanlin2022@sibcb.ac.cn>"
+]
+version = "0.1.0"
+readme = "README.md"
+packages = [
+    { include = "instrumental_data_analyzer" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+impedance = "*"
+jupyter = "*"

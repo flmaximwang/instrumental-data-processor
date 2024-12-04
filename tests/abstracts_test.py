@@ -4,7 +4,7 @@ sys.path.append('..')
 import unittest
 import os
 import pandas as pd
-from instrumental_data_processor import abstracts
+from instrumental_data_analyzer import abstracts
 
 class TestSignal(unittest.TestCase):
     

@@ -5,7 +5,7 @@ import unittest
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from instrumental_data_processor import instruments
+from instrumental_data_analyzer import instruments
 
 class TestChemStationChromatographyNumericSignal(unittest.TestCase):
     
